@@ -1,0 +1,84 @@
+<?php
+
+function views_fix_pager_export($file) {
+  
+  if (!is_dir(dirname($file))) {
+    $file = dirname(__FILE__) . '/view_config.txt';
+  }
+  // header vid|id|iterms_per_page|offset|use_pager 
+  $rows = 'vid|id|iterms_per_page|offset|use_pager';
+  $rows .= "\n";
+  $result = db_query("SELECT * FROM {views_display}" );
+  while ($variable = db_fetch_object($result)) {
+
+    $options = unserialize($variable->display_options);
+    $rows .= $variable->vid;
+    $rows .= '|';
+    $rows .= $variable->id;
+    $rows .= '|';
+    $rows .= $options['items_per_page'];
+    $rows .= '|';
+    $rows .= $options['offset'];
+    $rows .= '|';
+    $rows .= $options['use_pager'];
+    $rows .= "\n";
+  }
+  try {
+    file_put_contents($file, $rows);
+  } catch (Exception $e){
+    echo $e->getMessage();
+  }
+  echo  "File exported at : " . $file . "\n";
+}
+
+function views_fix_pager_import($file) {
+  if (!file_exists($file)) {
+    return FALSE;
+  }
+  $contents = trim(file_get_contents($file));
+  if (!$contents) {
+    return null;
+  }
+  $rows = explode("\n", $contents);
+  $rows = array_slice($rows, 1); 
+  foreach($rows as $row){
+    $row = explode("|", $row);
+    $view_id         = $row[0];
+    $view_display_id = $row[1];
+    $items_per_page  = $row[2];
+    $offset          = $row[3];
+    $use_pager       = $row[4];
+
+    if (empty($use_pager) && empty($items_per_page) && empty($offset))    continue;
+
+    $result = db_query("SELECT name FROM {views_view} WHERE vid='%s'", $view_id);
+    $variable = db_fetch_object($result);
+    switch ($use_pager) {
+      case '0':
+        $type = 'some';
+        break;
+      case '1':
+        $type = 'full';
+        break;
+      case 'mini':
+        $type = 'mini';
+        break;
+
+      default:
+        $type = 'some';
+        break;
+    }
+    $option['type'] = $type;
+    if (!empty($offset)) {
+      $option['options']['offset'] = $offset;
+    }
+    if (!empty($items_per_page)) {
+      $option['options']['items_per_page'] = $items_per_page;
+    }
+    $view = views_get_view($variable->name, TRUE);
+    $view->set_display($view_display_id);
+    $view->display_handler->override_option('pager', $option);
+    $view->save();
+  }
+  echo "Fix done \n";
+}

@@ -1,0 +1,5 @@
+name = Fix views pager
+description = Fix views pager when update views 2 to 3
+core = 6.x
+package = "Viet Coop"
+
